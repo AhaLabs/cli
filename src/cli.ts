@@ -23,7 +23,7 @@ async function spawn(args: string[], cwd?: string): Promise<void> {
   })
 }
 
-interface Workspace {
+interface WorkspaceMember {
   name: string,
   version: string,
   libPath: string,
@@ -40,10 +40,10 @@ function wasmBinName(name: string): string {
 class CargoMetadata {
   constructor(private data: any, private config: Config) { }
 
-  get workspace_members(): Workspace[] {
+  get workspace_members(): WorkspaceMember[] {
     return this.data.workspace_members.map((m: string) => {
       let [name, version, libPath] = m.split(' ');
-      libPath = libPath.split("file://")[1];
+      libPath = libPath.replace("(path+file://", "");
       libPath = libPath.slice(0, libPath.length - 1);
       const binPath = path.join(this.target_directory, "wasm32-unknown-unknown", this.config.release ? "debug" : "release", wasmBinName(name));
       return { name, version, libPath, binPath }
@@ -83,71 +83,79 @@ function build_cmd(args: { release: boolean, feature: string[], package?: string
 }
 
 try {
-// eslint-disable-next-line no-var
-yargs
-  .scriptName('aha')
-  .command(
-    'build',
-    'Build contracts',
-    (y) => {
-      y.option('package', {
-        describe: 'Name of package in current workspace',
-        type: 'string',
-      }).option('feature', {
-        describe: "feature to pass to cargo",
-        type: 'array',
-        default: [],
-      })
-        .option('release', {
-          describe: 'Build release build. Default is debug',
-          default: false,
-          type: 'boolean',
+  // eslint-disable-next-line no-var
+  yargs
+    .scriptName('aha')
+    .command(
+      'build',
+      'Build contracts',
+      (y) => {
+        y.option('package', {
+          describe: 'Name of package in current workspace',
+          type: 'string',
+        }).option('feature', {
+          describe: "feature to pass to cargo",
+          type: 'array',
+          default: [],
         })
-        .option('sdk', {
-          describe: 'Include wit types from near-sdk-rs',
-          default: false,
-          type: 'boolean',
-        })
-        .option('standards', {
-          describe: 'Include wit types from near-contract-standards',
-          default: false,
-          type: 'boolean',
-        });
-    },
-    async (argv) => {
-      const metadata = await CargoMetadata.fetch({ release: argv.release as boolean });
-      let cmd = build_cmd(argv as any);
-      const now = Date.now();
-      let members = metadata.workspace_members;
-      let binary = await getBinary();
+          .option('release', {
+            describe: 'Build release build. Default is debug',
+            default: false,
+            type: 'boolean',
+          })
+          .option('sdk', {
+            describe: 'Include wit types from near-sdk-rs',
+            default: false,
+            type: 'boolean',
+          })
+          .option('standards', {
+            describe: 'Include wit types from near-contract-standards',
+            default: false,
+            type: 'boolean',
+          });
+      },
+      async (argv) => {
+        const metadata = await CargoMetadata.fetch({ release: argv.release as boolean });
+        let cmd = build_cmd(argv as any);
+        const now = Date.now();
+        let members = metadata.workspace_members;
+        let binary = await getBinary();
+        let witme = binary.binPath;
 
-      try {
-        await spawn(cmd);
-      } catch (e) {
-        console.log(e)
-      }
-      for (let { binPath, libPath, name } of members) {
-        let stat = await fs.stat(binPath);
-        if (stat.mtimeMs - now != 0) {
-          await mkdir("./res")
-          let args = [binary.binPath, "near", "wit", "-t", "./wit", "-o", "wit/index.wit"];
-          if (argv.sdk) {
-            args.push("--sdk");
-          }
-          if (argv.standards) {
-            args.push("--standards");
-          }
-          await spawn(args, libPath);
-          await spawn([binary.binPath, "near", "json", "-o", "wit"], libPath);
-          let json = require(path.join(libPath, "wit", "index.schema.json"))
-          let ipfsHash = await uploadJSON(json)
-          let data = makeLinks(ipfsHash);
-          console.log("uploaded: ", data);
-          await spawn([binary.binPath, "near", "inject", "--name", "json", "--data", data, "--input", binPath, "--output", `./res/${wasmBinName(name)}`]);
+        try {
+          await spawn(cmd);
+        } catch (e) {
+          console.error(e);
+          return;
         }
-      }
-    },
-  ).argv;
+        const bin_dir = path.join(metadata.target_directory, "res");
+        const wit_dir = path.join(metadata.target_directory, "wit");
+        await mkdir(bin_dir);
+        await mkdir(wit_dir);
+        for (let { binPath, libPath, name } of members) {
+          let stat = await fs.stat(binPath);
+          if (stat.mtimeMs - now != 0) {
+            const dir = path.join(wit_dir, name.replaceAll("-", "_"));
+            await mkdir(dir);
+            let args = [witme, "near", "wit", "-t", dir, "-o", `${dir}/index.wit`];
+            if (argv.sdk) {
+              console.log("adding sdk")
+              args.push("--sdk");
+            }
+            if (argv.standards) {
+              args.push("--standards");
+            }
+            await spawn(args, libPath);
+            await spawn([witme, "near", "json", "-o", dir, "-i", `${dir}/index.ts`], libPath);
+            let json = require(path.join(dir, "index.schema.json"))
+            let ipfsHash = await uploadJSON(json)
+            let data = makeLinks(ipfsHash);
+            console.log("uploaded: ", data);
+            await spawn([witme, "near", "inject", "--name", "json", "--data", data, "--input", binPath, "--output", `${bin_dir}/${wasmBinName(name)}`]);
+          }
+        }
+      },
+    ).argv;
 } catch (e) {
   console.error(e);
   process.exit(1);
@@ -156,18 +164,18 @@ yargs
 async function mkdir(s: string): Promise<void> {
   try {
     await fs.mkdir(s)
-  } catch (e) {
-    console.error(e)
+  } catch (e: any) {
+    if (e.code !== 'EEXIST') {
+      throw e;
+    }
   }
 }
 
 async function packCar(p: string): Promise<{ root: CID, filename: string }> {
   return await packToFs({ input: path.join(p, "wit"), output: path.join(p, "wit.car"), wrapWithDirectory: false });
-  
+
 }
 
 function makeLinks(s: string): string {
-  return `https://${s}.ipfs.dweb.link/index.schema.json;`;
+  return `https://${s}.ipfs.dweb.link`;
 }
-
-

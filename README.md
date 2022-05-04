@@ -8,7 +8,7 @@ npm install -g aha-cli
 
 ## Setup
 
-### Get pinata account and add your API key
+### Get pinata account and add your API key to ENV
 
 ```bash
 export PINATA_API_KEY=""
@@ -24,6 +24,11 @@ rustup target add wasm32-unknown-unknown
 ```
 
 
-### commands
+## Commands
 
-- 'build' compiles the contracts, generates wit, ts, and json.  Then optionally can upload the 
+### `build`
+
+'build' compiles a workspace of contracts and generates wit, ts, and json. The `json` is then pinned to IPFS using [Pinata](https://app.pinata.cloud/).
+The resulting IPFS content address is written to a custom section in each contract binary.
+
+Currently we use the `json` name for the custom section.

@@ -34,9 +34,9 @@ impl Default for Contract {
 
 #[near_bindgen]
 impl Contract {
-    /// A change call to set the message
-    pub fn set_message(&mut self, message: Message) {
-        self.message = message;
+    /// A change call to set the message.  Returns old message
+    pub fn set_message(&mut self, message: Message) -> Message {
+        std::mem::replace(&mut self.message, message)
     }
     
 }
