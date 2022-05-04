@@ -3,56 +3,63 @@
 import yargs from 'yargs';
 import * as child_process from 'child_process';
 import { promisify } from 'util';
-import * as fs from "fs/promises";
-import * as path from "path";
-import { getBinary } from "witme/dist/getBinary";
-import { uploadDirectory, uploadFile, uploadJSON } from './pinata';
-import { packToFs } from 'ipfs-car/pack/fs';
-import { CID } from '@ipld/car/indexer';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { getBinary } from 'witme/dist/getBinary';
+import { uploadJSON } from './pinata';
+// import { packToFs } from 'ipfs-car/pack/fs';
+// import { CID } from '@ipld/car/indexer';
 
 const exec = promisify(child_process.exec);
 
-function cargo(args: string[]): Promise<{ stdout: string, stderr: string }> {
-  return exec(args.join(" "));
+function cargo(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  return exec(args.join(' '));
 }
 
 async function spawn(args: string[], cwd?: string): Promise<void> {
-  let child = child_process.spawn(args[0], args.slice(1), { cwd, stdio: ['inherit', 'inherit', 'inherit'] });
+  const child = child_process.spawn(args[0], args.slice(1), {
+    cwd,
+    stdio: ['inherit', 'inherit', 'inherit'],
+  });
   return await new Promise((resolve, reject) => {
-    child.on('exit', (code) => code == 0 ? resolve() : reject())
-  })
+    child.on('exit', (code) => (code == 0 ? resolve() : reject()));
+  });
 }
 
 interface WorkspaceMember {
-  name: string,
-  version: string,
-  libPath: string,
-  binPath: string,
+  name: string;
+  version: string;
+  libPath: string;
+  binPath: string;
 }
 
 interface Config {
-  release: boolean,
+  release: boolean;
 }
 
 function wasmBinName(name: string): string {
-  return `${name.replaceAll("-", "_")}.wasm`;
+  return `${name.replaceAll('-', '_')}.wasm`;
 }
 class CargoMetadata {
-  constructor(private data: any, private config: Config) { }
+  constructor(private data: any, private config: Config) {}
 
   get workspace_members(): WorkspaceMember[] {
     return this.data.workspace_members.map((m: string) => {
-      let [name, version, libPath] = m.split(' ');
-      libPath = libPath.replace("(path+file://", "");
+      const [name, version, path_str] = m.split(' ');
+      let libPath = path_str.replace('(path+file://', '');
       libPath = libPath.slice(0, libPath.length - 1);
-      const binPath = path.join(this.target_directory, "wasm32-unknown-unknown", this.config.release ? "debug" : "release", wasmBinName(name));
-      return { name, version, libPath, binPath }
+      const binPath = path.join(
+        this.target_directory,
+        'wasm32-unknown-unknown',
+        this.config.release ? 'debug' : 'release',
+        wasmBinName(name),
+      );
+      return { name, version, libPath, binPath };
     });
-
   }
 
   static async fetch(config: Config): Promise<CargoMetadata> {
-    return this.fromString((await cargo(["cargo", "metadata"])).stdout, config)
+    return this.fromString((await cargo(['cargo', 'metadata'])).stdout, config);
   }
 
   static fromString(s: string, config: Config): CargoMetadata {
@@ -62,100 +69,109 @@ class CargoMetadata {
   get target_directory(): string {
     return this.data.target_directory;
   }
-
 }
 
-
-function build_cmd(args: { release: boolean, feature: string[], package?: string }): string[] {
-  let cmd = ["cargo", "build", "--target", "wasm32-unknown-unknown"];
+function build_cmd(args: { release: boolean; feature: string[]; package?: string }): string[] {
+  const cmd = ['cargo', 'build', '--target', 'wasm32-unknown-unknown'];
   if (args.release) {
-    cmd.push("--release");
+    cmd.push('--release');
   }
   if (args.package) {
-    cmd.push("--package", args.package);
+    cmd.push('--package', args.package);
   } else {
-    cmd.push("--all");
+    cmd.push('--all');
   }
-  for (let feature of args.feature) {
-    cmd.push("--feature", feature)
+  for (const feature of args.feature) {
+    cmd.push('--feature', feature);
   }
   return cmd;
 }
 
 try {
   // eslint-disable-next-line no-var
-  yargs
-    .scriptName('aha')
-    .command(
-      'build',
-      'Build contracts',
-      (y) => {
-        y.option('package', {
-          describe: 'Name of package in current workspace',
-          type: 'string',
-        }).option('feature', {
-          describe: "feature to pass to cargo",
+  yargs.scriptName('aha').command(
+    'build',
+    'Build contracts',
+    (y) => {
+      y.option('package', {
+        describe: 'Name of package in current workspace',
+        type: 'string',
+      })
+        .option('feature', {
+          describe: 'feature to pass to cargo',
           type: 'array',
           default: [],
         })
-          .option('release', {
-            describe: 'Build release build. Default is debug',
-            default: false,
-            type: 'boolean',
-          })
-          .option('sdk', {
-            describe: 'Include wit types from near-sdk-rs',
-            default: false,
-            type: 'boolean',
-          })
-          .option('standards', {
-            describe: 'Include wit types from near-contract-standards',
-            default: false,
-            type: 'boolean',
-          });
-      },
-      async (argv) => {
-        const metadata = await CargoMetadata.fetch({ release: argv.release as boolean });
-        let cmd = build_cmd(argv as any);
-        const now = Date.now();
-        let members = metadata.workspace_members;
-        let binary = await getBinary();
-        let witme = binary.binPath;
+        .option('release', {
+          describe: 'Build release build. Default is debug',
+          default: false,
+          type: 'boolean',
+        })
+        .option('sdk', {
+          describe: 'Include wit types from near-sdk-rs',
+          default: false,
+          type: 'boolean',
+        })
+        .option('standards', {
+          describe: 'Include wit types from near-contract-standards',
+          default: false,
+          type: 'boolean',
+        });
+    },
+    async (argv) => {
+      const metadata = await CargoMetadata.fetch({ release: argv.release as boolean });
+      const cmd = build_cmd(argv as any);
+      const now = Date.now();
+      const members = metadata.workspace_members;
+      const binary = await getBinary();
+      const witme = binary.binPath;
 
-        try {
-          await spawn(cmd);
-        } catch (e) {
-          console.error(e);
-          return;
-        }
-        const bin_dir = path.join(metadata.target_directory, "res");
-        const wit_dir = path.join(metadata.target_directory, "wit");
-        await mkdir(bin_dir);
-        await mkdir(wit_dir);
-        for (let { binPath, libPath, name } of members) {
-          let stat = await fs.stat(binPath);
-          if (stat.mtimeMs - now != 0) {
-            const dir = path.join(wit_dir, name.replaceAll("-", "_"));
-            await mkdir(dir);
-            let args = [witme, "near", "wit", "-t", dir, "-o", `${dir}/index.wit`];
-            if (argv.sdk) {
-              console.log("adding sdk")
-              args.push("--sdk");
-            }
-            if (argv.standards) {
-              args.push("--standards");
-            }
-            await spawn(args, libPath);
-            await spawn([witme, "near", "json", "-o", dir, "-i", `${dir}/index.ts`], libPath);
-            let json = require(path.join(dir, "index.schema.json"))
-            let ipfsHash = await uploadJSON(json)
-            let data = makeLinks(ipfsHash);
-            console.log("uploaded: ", data);
-            await spawn([witme, "near", "inject", "--name", "json", "--data", data, "--input", binPath, "--output", `${bin_dir}/${wasmBinName(name)}`]);
+      try {
+        await spawn(cmd);
+      } catch (e) {
+        console.error(e);
+        return;
+      }
+      const bin_dir = path.join(metadata.target_directory, 'res');
+      const wit_dir = path.join(metadata.target_directory, 'wit');
+      await mkdir(bin_dir);
+      await mkdir(wit_dir);
+      for (const { binPath, libPath, name } of members) {
+        const stat = await fs.stat(binPath);
+        if (stat.mtimeMs - now != 0) {
+          const dir = path.join(wit_dir, name.replaceAll('-', '_'));
+          await mkdir(dir);
+          const args = [witme, 'near', 'wit', '-t', dir, '-o', `${dir}/index.wit`];
+          if (argv.sdk) {
+            console.log('adding sdk');
+            args.push('--sdk');
           }
+          if (argv.standards) {
+            args.push('--standards');
+          }
+          await spawn(args, libPath);
+          await spawn([witme, 'near', 'json', '-o', dir, '-i', `${dir}/index.ts`], libPath);
+          const json = JSON.parse(await fs.readFile(path.join(dir, 'index.schema.json'), 'utf8'));
+          const ipfsHash = await uploadJSON(json);
+          const data = makeLinks(ipfsHash);
+          console.log('uploaded: ', data);
+          await spawn([
+            witme,
+            'near',
+            'inject',
+            '--name',
+            'json',
+            '--data',
+            data,
+            '--input',
+            binPath,
+            '--output',
+            `${bin_dir}/${wasmBinName(name)}`,
+          ]);
         }
-      },
-    ).argv;
+      }
+    },
+  ).argv;
 } catch (e) {
   console.error(e);
   process.exit(1);
@@ -163,7 +179,7 @@ try {
 
 async function mkdir(s: string): Promise<void> {
   try {
-    await fs.mkdir(s)
+    await fs.mkdir(s);
   } catch (e: any) {
     if (e.code !== 'EEXIST') {
       throw e;
@@ -171,10 +187,13 @@ async function mkdir(s: string): Promise<void> {
   }
 }
 
-async function packCar(p: string): Promise<{ root: CID, filename: string }> {
-  return await packToFs({ input: path.join(p, "wit"), output: path.join(p, "wit.car"), wrapWithDirectory: false });
-
-}
+// async function packCar(p: string): Promise<{ root: CID; filename: string }> {
+//   return await packToFs({
+//     input: path.join(p, 'wit'),
+//     output: path.join(p, 'wit.car'),
+//     wrapWithDirectory: false,
+//   });
+// }
 
 function makeLinks(s: string): string {
   return `https://${s}.ipfs.dweb.link`;

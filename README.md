@@ -23,12 +23,10 @@ export PINATA_API_SECRET=""
 rustup target add wasm32-unknown-unknown
 ```
 
-
 ## Commands
 
 ### `build`
 
-'build' compiles a workspace of contracts and generates wit, ts, and json. The `json` is then pinned to IPFS using [Pinata](https://app.pinata.cloud/).
-The resulting IPFS content address is written to a custom section in each contract binary.
+'build' compiles a workspace of contracts and generates wit, ts, and json. The `json` is then pinned to IPFS using [Pinata](https://app.pinata.cloud/). The resulting IPFS content address is written to a custom section in each contract binary.
 
 Currently we use the `json` name for the custom section.

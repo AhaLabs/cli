@@ -13,16 +13,10 @@
   ],
   "scripts": {
     "build": "tsc",
-    "lint": "eslint . --ext '.js,.jsx,.ts,.tsx,.md'",
-    "prettier": "prettier -c --write '**/*'",
-    "test": "echo Passed!",
-    "hook": "npm run build && npm run prettier && npm run lint && npm run test",
+    "lint": "eslint src --ext '.js,.jsx,.ts,.tsx,.md'",
+    "prettier": "prettier -c --write './src/**/*'",
+    "test": "npm run build && npm run prettier && npm run lint",
     "aha": "ts-node src/cli.ts"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm run hook"
-    }
   },
   "repository": {
     "type": "git",
@@ -42,7 +36,6 @@
   },
   "homepage": "https://github.com/TENK-DAO/nft-cli",
   "devDependencies": {
-    "@types/figlet": "^1.5.4",
     "@types/jest": "^27.0.3",
     "@types/node": "^16.11.13",
     "@types/yargs": "^17.0.7",
@@ -56,7 +49,6 @@
     "eslint-plugin-jsx-a11y": "^6.5.1",
     "eslint-plugin-markdown": "^2.2.1",
     "eslint-plugin-prettier": "^4.0.0",
-    "husky": "^7.0.4",
     "jest": "^27.4.5",
     "prettier": "^2.5.1",
     "ts-jest": "^27.1.1",
@@ -66,8 +58,6 @@
     "@ipld/car": "^4.0.0",
     "@pinata/sdk": "^1.1.25",
     "bn.js": "^5.2.0",
-    "chalk": "^4.0.0",
-    "figlet": "^1.5.2",
     "ipfs-car": "^0.6.2",
     "near-api-js": "git+https://github.com/ahalabs/near-api-js#beta",
     "nft.storage": "^6.0.2",
