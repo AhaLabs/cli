@@ -27,7 +27,7 @@
     "CLI"
   ],
   "engines": {
-    "node": ">=10"
+    "node": ">=14"
   },
   "author": "Willem Wyndham",
   "license": "Apache-2.0",
@@ -68,5 +68,8 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
+  },
+  "overrides": {
+    "near-api-js": "git+https://github.com/ahalabs/near-api-js#beta"
   }
 }
