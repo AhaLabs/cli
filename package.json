@@ -74,5 +74,9 @@
     "witme": "^0.2.5",
     "yargs": "^17.3.0"
   },
-  "private": false
+  "private": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }
