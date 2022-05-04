@@ -59,7 +59,6 @@
     "@pinata/sdk": "^1.1.25",
     "bn.js": "^5.2.0",
     "ipfs-car": "^0.6.2",
-    "near-api-js": "git+https://github.com/ahalabs/near-api-js#beta",
     "nft.storage": "^6.0.2",
     "witme": "^0.2.5",
     "yargs": "^17.3.0"
@@ -68,8 +67,5 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
-  },
-  "overrides": {
-    "near-api-js": "git+https://github.com/ahalabs/near-api-js#beta"
   }
 }
