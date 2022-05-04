@@ -3,7 +3,7 @@
 Currently supports Rust Contracts.
 
 ```bash
-npm install -g aha-cli
+npm install -g @ahalabs/cli@ahalabs/cli
 ```
 
 ## Setup
