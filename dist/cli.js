@@ -139,7 +139,18 @@ try {
                     return [4 /*yield*/, (0, util_1.mkdir)(dir)];
                 case 10:
                     _b.sent();
-                    args = [witme, 'near', 'wit', '-t', dir, '-o', "".concat(dir, "/index.wit"), '-i', "".concat(libPath, "/src/lib.rs"), "--sdk"];
+                    args = [
+                        witme,
+                        'near',
+                        'wit',
+                        '-t',
+                        dir,
+                        '-o',
+                        "".concat(dir, "/index.wit"),
+                        '-i',
+                        "".concat(libPath, "/src/lib.rs"),
+                        "--sdk",
+                    ];
                     if (argv.standards) {
                         args.push('--standards');
                     }
@@ -180,14 +191,4 @@ try {
 catch (e) {
     console.error(e);
     process.exit(1);
-}
-// async function packCar(p: string): Promise<{ root: CID; filename: string }> {
-//   return await packToFs({
-//     input: path.join(p, 'wit'),
-//     output: path.join(p, 'wit.car'),
-//     wrapWithDirectory: false,
-//   });
-// }
-function makeLinks(s) {
-    return "https://".concat(s, ".ipfs.dweb.link");
 }

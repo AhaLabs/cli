@@ -1,29 +1,29 @@
 import * as child_process from 'child_process';
-import * as path from "path";
+import * as path from 'path';
 import * as fs from 'fs/promises';
 import { promisify } from 'util';
 
-import * as brotli from "brotli";
+import * as brotli from 'brotli';
 
 /**
- * 
+ *
  * @param wit_output_dir output for wit
  */
 export async function compressSchema(wit_output_dir: string): Promise<string> {
-  const json = JSON.parse(await fs.readFile(path.join(wit_output_dir, 'index.schema.json'), 'utf8'));
+  const json = JSON.parse(
+    await fs.readFile(path.join(wit_output_dir, 'index.schema.json'), 'utf8'),
+  );
   const json_data = compress(json);
   const min_file = path.join(wit_output_dir, 'index.schema.json.br');
   await fs.writeFile(min_file, json_data);
   return min_file;
 }
 
-
 export function compress(data: object): Uint8Array {
-  let str = JSON.stringify(data);
+  const str = JSON.stringify(data);
   debugger;
   return brotli.compress(Buffer.from(str, 'utf-8'));
 }
-
 
 export const exec = promisify(child_process.exec);
 
@@ -56,9 +56,8 @@ export function wasmBinName(name: string): string {
   return `${name.replaceAll('-', '_')}.wasm`;
 }
 
-
 export class CargoMetadata {
-  constructor(private data: any, private config: Config) { }
+  constructor(private data: any, private config: Config) {}
 
   get workspace_members(): WorkspaceMember[] {
     return this.data.workspace_members.map((m: string) => {
@@ -101,7 +100,11 @@ export class CargoMetadata {
   }
 }
 
-export function build_cmd(args: { release: boolean; feature: string[]; package?: string }): string[] {
+export function build_cmd(args: {
+  release: boolean;
+  feature: string[];
+  package?: string;
+}): string[] {
   const cmd = ['cargo', 'build', '--target', 'wasm32-unknown-unknown'];
   if (args.release) {
     cmd.push('--release');

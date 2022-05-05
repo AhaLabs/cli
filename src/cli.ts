@@ -4,9 +4,7 @@ import yargs from 'yargs';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getBinary } from 'witme/dist/getBinary';
-import { build_cmd, CargoMetadata, compress, compressSchema, mkdir, spawn, wasmBinName } from './util';
-
-
+import { build_cmd, CargoMetadata, compressSchema, mkdir, spawn, wasmBinName } from './util';
 
 try {
   // eslint-disable-next-line no-var
@@ -61,12 +59,23 @@ try {
         if (stat.mtimeMs - now != 0) {
           const dir = path.join(wit_dir, name.replaceAll('-', '_'));
           await mkdir(dir);
-          const args = [witme, 'near', 'wit', '-t', dir, '-o', `${dir}/index.wit`, '-i', `${libPath}/src/lib.rs`, `--sdk`];
+          const args = [
+            witme,
+            'near',
+            'wit',
+            '-t',
+            dir,
+            '-o',
+            `${dir}/index.wit`,
+            '-i',
+            `${libPath}/src/lib.rs`,
+            `--sdk`,
+          ];
           if (argv.standards) {
             args.push('--standards');
           }
           await spawn(args);
-          let json_args = [witme, 'near', 'json', '-o', dir, '-i', `${dir}/index.ts`];
+          const json_args = [witme, 'near', 'json', '-o', dir, '-i', `${dir}/index.ts`];
           await spawn(json_args);
           const min_file = await compressSchema(dir);
           await spawn([
@@ -90,17 +99,3 @@ try {
   console.error(e);
   process.exit(1);
 }
-
-
-// async function packCar(p: string): Promise<{ root: CID; filename: string }> {
-//   return await packToFs({
-//     input: path.join(p, 'wit'),
-//     output: path.join(p, 'wit.car'),
-//     wrapWithDirectory: false,
-//   });
-// }
-
-function makeLinks(s: string): string {
-  return `https://${s}.ipfs.dweb.link`;
-}
-
