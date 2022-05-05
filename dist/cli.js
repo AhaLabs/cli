@@ -64,100 +64,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var yargs_1 = __importDefault(require("yargs"));
-var child_process = __importStar(require("child_process"));
-var util_1 = require("util");
 var fs = __importStar(require("fs/promises"));
 var path = __importStar(require("path"));
 var getBinary_1 = require("witme/dist/getBinary");
-var pinata_1 = require("./pinata");
-// import { packToFs } from 'ipfs-car/pack/fs';
-// import { CID } from '@ipld/car/indexer';
-var exec = (0, util_1.promisify)(child_process.exec);
-function cargo(args) {
-    return exec(args.join(' '));
-}
-function spawn(args, cwd) {
-    return __awaiter(this, void 0, void 0, function () {
-        var child;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    child = child_process.spawn(args[0], args.slice(1), {
-                        cwd: cwd,
-                        stdio: ['inherit', 'inherit', 'inherit'],
-                    });
-                    return [4 /*yield*/, new Promise(function (resolve, reject) {
-                            child.on('exit', function (code) { return (code == 0 ? resolve() : reject()); });
-                        })];
-                case 1: return [2 /*return*/, _a.sent()];
-            }
-        });
-    });
-}
-function wasmBinName(name) {
-    return "".concat(name.replaceAll('-', '_'), ".wasm");
-}
-var CargoMetadata = /** @class */ (function () {
-    function CargoMetadata(data, config) {
-        this.data = data;
-        this.config = config;
-    }
-    Object.defineProperty(CargoMetadata.prototype, "workspace_members", {
-        get: function () {
-            var _this = this;
-            return this.data.workspace_members.map(function (m) {
-                var _a = m.split(' '), name = _a[0], version = _a[1], path_str = _a[2];
-                var libPath = path_str.replace('(path+file://', '');
-                libPath = libPath.slice(0, libPath.length - 1);
-                var binPath = path.join(_this.target_directory, 'wasm32-unknown-unknown', _this.config.release ? 'debug' : 'release', wasmBinName(name));
-                return { name: name, version: version, libPath: libPath, binPath: binPath };
-            });
-        },
-        enumerable: false,
-        configurable: true
-    });
-    CargoMetadata.fetch = function (config) {
-        return __awaiter(this, void 0, void 0, function () {
-            var _a;
-            return __generator(this, function (_b) {
-                switch (_b.label) {
-                    case 0:
-                        _a = this.fromString;
-                        return [4 /*yield*/, cargo(['cargo', 'metadata'])];
-                    case 1: return [2 /*return*/, _a.apply(this, [(_b.sent()).stdout, config])];
-                }
-            });
-        });
-    };
-    CargoMetadata.fromString = function (s, config) {
-        return new CargoMetadata(JSON.parse(s), config);
-    };
-    Object.defineProperty(CargoMetadata.prototype, "target_directory", {
-        get: function () {
-            return this.data.target_directory;
-        },
-        enumerable: false,
-        configurable: true
-    });
-    return CargoMetadata;
-}());
-function build_cmd(args) {
-    var cmd = ['cargo', 'build', '--target', 'wasm32-unknown-unknown'];
-    if (args.release) {
-        cmd.push('--release');
-    }
-    if (args.package) {
-        cmd.push('--package', args.package);
-    }
-    else {
-        cmd.push('--all');
-    }
-    for (var _i = 0, _a = args.feature; _i < _a.length; _i++) {
-        var feature = _a[_i];
-        cmd.push('--feature', feature);
-    }
-    return cmd;
-}
+var util_1 = require("./util");
 try {
     // eslint-disable-next-line no-var
     yargs_1.default.scriptName('aha').command('build', 'Build contracts', function (y) {
@@ -186,95 +96,83 @@ try {
             type: 'boolean',
         });
     }, function (argv) { return __awaiter(void 0, void 0, void 0, function () {
-        var metadata, cmd, now, members, binary, witme, e_1, bin_dir, wit_dir, _i, members_1, _a, binPath, libPath, name, stat, dir, args, json, _b, _c, ipfsHash, data;
-        return __generator(this, function (_d) {
-            switch (_d.label) {
-                case 0: return [4 /*yield*/, CargoMetadata.fetch({ release: argv.release })];
+        var metadata, cmd, now, members, binary, witme, e_1, bin_dir, wit_dir, _i, members_1, _a, binPath, libPath, name, stat, dir, args, json_args, min_file;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0: return [4 /*yield*/, util_1.CargoMetadata.fetch({ release: argv.release })];
                 case 1:
-                    metadata = _d.sent();
-                    cmd = build_cmd(argv);
+                    metadata = _b.sent();
+                    return [4 /*yield*/, metadata.ensure_output_dirs()];
+                case 2:
+                    _b.sent();
+                    cmd = (0, util_1.build_cmd)(argv);
                     now = Date.now();
                     members = metadata.workspace_members;
                     return [4 /*yield*/, (0, getBinary_1.getBinary)()];
-                case 2:
-                    binary = _d.sent();
-                    witme = binary.binPath;
-                    _d.label = 3;
                 case 3:
-                    _d.trys.push([3, 5, , 6]);
-                    return [4 /*yield*/, spawn(cmd)];
+                    binary = _b.sent();
+                    witme = binary.binPath;
+                    _b.label = 4;
                 case 4:
-                    _d.sent();
-                    return [3 /*break*/, 6];
+                    _b.trys.push([4, 6, , 7]);
+                    return [4 /*yield*/, (0, util_1.spawn)(cmd)];
                 case 5:
-                    e_1 = _d.sent();
+                    _b.sent();
+                    return [3 /*break*/, 7];
+                case 6:
+                    e_1 = _b.sent();
                     console.error(e_1);
                     return [2 /*return*/];
-                case 6:
-                    bin_dir = path.join(metadata.target_directory, 'res');
-                    wit_dir = path.join(metadata.target_directory, 'wit');
-                    return [4 /*yield*/, mkdir(bin_dir)];
                 case 7:
-                    _d.sent();
-                    return [4 /*yield*/, mkdir(wit_dir)];
-                case 8:
-                    _d.sent();
+                    bin_dir = metadata.bin_output_dir;
+                    wit_dir = metadata.wit_output_dir;
                     _i = 0, members_1 = members;
-                    _d.label = 9;
-                case 9:
-                    if (!(_i < members_1.length)) return [3 /*break*/, 18];
+                    _b.label = 8;
+                case 8:
+                    if (!(_i < members_1.length)) return [3 /*break*/, 16];
                     _a = members_1[_i], binPath = _a.binPath, libPath = _a.libPath, name = _a.name;
                     return [4 /*yield*/, fs.stat(binPath)];
-                case 10:
-                    stat = _d.sent();
-                    if (!(stat.mtimeMs - now != 0)) return [3 /*break*/, 17];
+                case 9:
+                    stat = _b.sent();
+                    if (!(stat.mtimeMs - now != 0)) return [3 /*break*/, 15];
                     dir = path.join(wit_dir, name.replaceAll('-', '_'));
-                    return [4 /*yield*/, mkdir(dir)];
-                case 11:
-                    _d.sent();
-                    args = [witme, 'near', 'wit', '-t', dir, '-o', "".concat(dir, "/index.wit")];
-                    if (argv.sdk) {
-                        console.log('adding sdk');
-                        args.push('--sdk');
-                    }
+                    return [4 /*yield*/, (0, util_1.mkdir)(dir)];
+                case 10:
+                    _b.sent();
+                    args = [witme, 'near', 'wit', '-t', dir, '-o', "".concat(dir, "/index.wit"), '-i', "".concat(libPath, "/src/lib.rs"), "--sdk"];
                     if (argv.standards) {
                         args.push('--standards');
                     }
-                    return [4 /*yield*/, spawn(args, libPath)];
+                    return [4 /*yield*/, (0, util_1.spawn)(args)];
+                case 11:
+                    _b.sent();
+                    json_args = [witme, 'near', 'json', '-o', dir, '-i', "".concat(dir, "/index.ts")];
+                    return [4 /*yield*/, (0, util_1.spawn)(json_args)];
                 case 12:
-                    _d.sent();
-                    return [4 /*yield*/, spawn([witme, 'near', 'json', '-o', dir, '-i', "".concat(dir, "/index.ts")], libPath)];
+                    _b.sent();
+                    return [4 /*yield*/, (0, util_1.compressSchema)(dir)];
                 case 13:
-                    _d.sent();
-                    _c = (_b = JSON).parse;
-                    return [4 /*yield*/, fs.readFile(path.join(dir, 'index.schema.json'), 'utf8')];
-                case 14:
-                    json = _c.apply(_b, [_d.sent()]);
-                    return [4 /*yield*/, (0, pinata_1.uploadJSON)(json)];
-                case 15:
-                    ipfsHash = _d.sent();
-                    data = makeLinks(ipfsHash);
-                    console.log('uploaded: ', data);
-                    return [4 /*yield*/, spawn([
+                    min_file = _b.sent();
+                    return [4 /*yield*/, (0, util_1.spawn)([
                             witme,
                             'near',
                             'inject',
                             '--name',
                             'json',
-                            '--data',
-                            data,
+                            '--file',
+                            min_file,
                             '--input',
                             binPath,
                             '--output',
-                            "".concat(bin_dir, "/").concat(wasmBinName(name)),
+                            "".concat(bin_dir, "/").concat((0, util_1.wasmBinName)(name)),
                         ])];
-                case 16:
-                    _d.sent();
-                    _d.label = 17;
-                case 17:
+                case 14:
+                    _b.sent();
+                    _b.label = 15;
+                case 15:
                     _i++;
-                    return [3 /*break*/, 9];
-                case 18: return [2 /*return*/];
+                    return [3 /*break*/, 8];
+                case 16: return [2 /*return*/];
             }
         });
     }); }).argv;
@@ -282,28 +180,6 @@ try {
 catch (e) {
     console.error(e);
     process.exit(1);
-}
-function mkdir(s) {
-    return __awaiter(this, void 0, void 0, function () {
-        var e_2;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    _a.trys.push([0, 2, , 3]);
-                    return [4 /*yield*/, fs.mkdir(s)];
-                case 1:
-                    _a.sent();
-                    return [3 /*break*/, 3];
-                case 2:
-                    e_2 = _a.sent();
-                    if (e_2.code !== 'EEXIST') {
-                        throw e_2;
-                    }
-                    return [3 /*break*/, 3];
-                case 3: return [2 /*return*/];
-            }
-        });
-    });
 }
 // async function packCar(p: string): Promise<{ root: CID; filename: string }> {
 //   return await packToFs({
