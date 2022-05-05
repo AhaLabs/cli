@@ -1,91 +1,12 @@
 #!/usr/bin/env node
 
 import yargs from 'yargs';
-import * as child_process from 'child_process';
-import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getBinary } from 'witme/dist/getBinary';
-import { uploadJSON } from './pinata';
-// import { packToFs } from 'ipfs-car/pack/fs';
-// import { CID } from '@ipld/car/indexer';
+import { build_cmd, CargoMetadata, compress, compressSchema, mkdir, spawn, wasmBinName } from './util';
 
-const exec = promisify(child_process.exec);
 
-function cargo(args: string[]): Promise<{ stdout: string; stderr: string }> {
-  return exec(args.join(' '));
-}
-
-async function spawn(args: string[], cwd?: string): Promise<void> {
-  const child = child_process.spawn(args[0], args.slice(1), {
-    cwd,
-    stdio: ['inherit', 'inherit', 'inherit'],
-  });
-  return await new Promise((resolve, reject) => {
-    child.on('exit', (code) => (code == 0 ? resolve() : reject()));
-  });
-}
-
-interface WorkspaceMember {
-  name: string;
-  version: string;
-  libPath: string;
-  binPath: string;
-}
-
-interface Config {
-  release: boolean;
-}
-
-function wasmBinName(name: string): string {
-  return `${name.replaceAll('-', '_')}.wasm`;
-}
-class CargoMetadata {
-  constructor(private data: any, private config: Config) {}
-
-  get workspace_members(): WorkspaceMember[] {
-    return this.data.workspace_members.map((m: string) => {
-      const [name, version, path_str] = m.split(' ');
-      let libPath = path_str.replace('(path+file://', '');
-      libPath = libPath.slice(0, libPath.length - 1);
-      const binPath = path.join(
-        this.target_directory,
-        'wasm32-unknown-unknown',
-        this.config.release ? 'debug' : 'release',
-        wasmBinName(name),
-      );
-      return { name, version, libPath, binPath };
-    });
-  }
-
-  static async fetch(config: Config): Promise<CargoMetadata> {
-    return this.fromString((await cargo(['cargo', 'metadata'])).stdout, config);
-  }
-
-  static fromString(s: string, config: Config): CargoMetadata {
-    return new CargoMetadata(JSON.parse(s), config);
-  }
-
-  get target_directory(): string {
-    return this.data.target_directory;
-  }
-}
-
-function build_cmd(args: { release: boolean; feature: string[]; package?: string }): string[] {
-  const cmd = ['cargo', 'build', '--target', 'wasm32-unknown-unknown'];
-  if (args.release) {
-    cmd.push('--release');
-  }
-  if (args.package) {
-    cmd.push('--package', args.package);
-  } else {
-    cmd.push('--all');
-  }
-  for (const feature of args.feature) {
-    cmd.push('--feature', feature);
-  }
-  return cmd;
-}
 
 try {
   // eslint-disable-next-line no-var
@@ -120,6 +41,7 @@ try {
     },
     async (argv) => {
       const metadata = await CargoMetadata.fetch({ release: argv.release as boolean });
+      await metadata.ensure_output_dirs();
       const cmd = build_cmd(argv as any);
       const now = Date.now();
       const members = metadata.workspace_members;
@@ -132,37 +54,29 @@ try {
         console.error(e);
         return;
       }
-      const bin_dir = path.join(metadata.target_directory, 'res');
-      const wit_dir = path.join(metadata.target_directory, 'wit');
-      await mkdir(bin_dir);
-      await mkdir(wit_dir);
+      const bin_dir = metadata.bin_output_dir;
+      const wit_dir = metadata.wit_output_dir;
       for (const { binPath, libPath, name } of members) {
         const stat = await fs.stat(binPath);
         if (stat.mtimeMs - now != 0) {
           const dir = path.join(wit_dir, name.replaceAll('-', '_'));
           await mkdir(dir);
-          const args = [witme, 'near', 'wit', '-t', dir, '-o', `${dir}/index.wit`];
-          if (argv.sdk) {
-            console.log('adding sdk');
-            args.push('--sdk');
-          }
+          const args = [witme, 'near', 'wit', '-t', dir, '-o', `${dir}/index.wit`, '-i', `${libPath}/src/lib.rs`, `--sdk`];
           if (argv.standards) {
             args.push('--standards');
           }
-          await spawn(args, libPath);
-          await spawn([witme, 'near', 'json', '-o', dir, '-i', `${dir}/index.ts`], libPath);
-          const json = JSON.parse(await fs.readFile(path.join(dir, 'index.schema.json'), 'utf8'));
-          const ipfsHash = await uploadJSON(json);
-          const data = makeLinks(ipfsHash);
-          console.log('uploaded: ', data);
+          await spawn(args);
+          let json_args = [witme, 'near', 'json', '-o', dir, '-i', `${dir}/index.ts`];
+          await spawn(json_args);
+          const min_file = await compressSchema(dir);
           await spawn([
             witme,
             'near',
             'inject',
             '--name',
             'json',
-            '--data',
-            data,
+            '--file',
+            min_file,
             '--input',
             binPath,
             '--output',
@@ -177,15 +91,6 @@ try {
   process.exit(1);
 }
 
-async function mkdir(s: string): Promise<void> {
-  try {
-    await fs.mkdir(s);
-  } catch (e: any) {
-    if (e.code !== 'EEXIST') {
-      throw e;
-    }
-  }
-}
 
 // async function packCar(p: string): Promise<{ root: CID; filename: string }> {
 //   return await packToFs({
@@ -198,3 +103,4 @@ async function mkdir(s: string): Promise<void> {
 function makeLinks(s: string): string {
   return `https://${s}.ipfs.dweb.link`;
 }
+
