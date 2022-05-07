@@ -136,7 +136,7 @@ var CargoMetadata = /** @class */ (function () {
                 var _a = m.split(' '), name = _a[0], version = _a[1], path_str = _a[2];
                 var libPath = path_str.replace('(path+file://', '');
                 libPath = libPath.slice(0, libPath.length - 1);
-                var binPath = path.join(_this.target_directory, 'wasm32-unknown-unknown', _this.config.release ? 'debug' : 'release', wasmBinName(name));
+                var binPath = path.join(_this.target_directory, 'wasm32-unknown-unknown', _this.config.release ? 'release' : 'debug', wasmBinName(name));
                 return { name: name, version: version, libPath: libPath, binPath: binPath };
             });
         },

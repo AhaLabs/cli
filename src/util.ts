@@ -67,7 +67,7 @@ export class CargoMetadata {
       const binPath = path.join(
         this.target_directory,
         'wasm32-unknown-unknown',
-        this.config.release ? 'debug' : 'release',
+        this.config.release ? 'release' : 'debug',
         wasmBinName(name),
       );
       return { name, version, libPath, binPath };
