@@ -1,3 +1,8 @@
+# DEPRECATED:
+
+Moved here: https://github.com/raendev/raen
+
+
 # Build tool for NEAR smart contracts
 
 Currently supports Rust Contracts.
